@@ -1,0 +1,28 @@
+services:
+  nginx:
+    restart: always
+
+  app:
+    build:
+      target: production
+    restart: always
+    volumes: []
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=translation_service
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  db:
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+
+  redis:
+    restart: always
