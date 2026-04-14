@@ -1,0 +1,401 @@
+openapi: "3.0.3"
+
+info:
+  title: Translation Management API
+  description: >
+    Multi-locale translation management service with tag categorisation,
+    full-text search, and Redis-cached exports.
+    Authenticate via POST /api/v1/auth/token, then click **Authorize** and paste the token.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8000
+    description: Local Docker
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+      description: Token returned by POST /api/v1/auth/token
+
+  schemas:
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: mobile
+
+    Translation:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        key:
+          type: string
+          example: auth.login
+        locale:
+          type: string
+          example: en
+        content:
+          type: string
+          example: Login
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: The key field is required.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+paths:
+
+  # ── Auth ─────────────────────────────────────────────────────────────────
+
+  /api/v1/auth/token:
+    post:
+      summary: Issue API token
+      description: >
+        Authenticate with email and password.
+        Copy the token from the response, click **Authorize** at the top,
+        and paste it to unlock all protected endpoints.
+      operationId: authToken
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "1|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Invalid credentials.
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  # ── Translations ──────────────────────────────────────────────────────────
+
+  /api/v1/translations:
+    get:
+      summary: List translations
+      description: >
+        Returns a paginated list of translations.
+        Supports optional filtering by key (partial match), locale, content (full-text search),
+        and tag name. Content search uses MySQL FULLTEXT for terms ≥ 3 characters,
+        LIKE fallback otherwise.
+      operationId: listTranslations
+      tags: [Translations]
+      security: [{bearerAuth: []}]
+      parameters:
+        - name: key
+          in: query
+          description: Partial match on translation key
+          schema: {type: string, example: auth}
+        - name: locale
+          in: query
+          description: Exact locale code
+          schema: {type: string, example: en}
+        - name: content
+          in: query
+          description: Search within content
+          schema: {type: string, example: Login}
+        - name: tag
+          in: query
+          description: Filter by tag name
+          schema: {type: string, example: mobile}
+        - name: per_page
+          in: query
+          description: Items per page (max 100, default 15)
+          schema: {type: integer, default: 15, maximum: 100}
+        - name: page
+          in: query
+          description: Page number
+          schema: {type: integer, default: 1}
+      responses:
+        "200":
+          description: Paginated translations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Translation"
+                  links:
+                    type: object
+                    properties:
+                      first: {type: string}
+                      last:  {type: string}
+                      prev:  {type: string, nullable: true}
+                      next:  {type: string, nullable: true}
+                  meta:
+                    type: object
+                    properties:
+                      current_page: {type: integer, example: 1}
+                      per_page:     {type: integer, example: 15}
+                      total:        {type: integer, example: 42}
+        "401": {description: Unauthenticated}
+
+    post:
+      summary: Create translation
+      operationId: createTranslation
+      tags: [Translations]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, locale, content]
+              properties:
+                key:
+                  type: string
+                  example: auth.login
+                locale:
+                  type: string
+                  example: en
+                content:
+                  type: string
+                  example: Login
+                tags:
+                  type: array
+                  items: {type: string}
+                  example: [web, mobile]
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Translation"
+        "401": {description: Unauthenticated}
+        "422":
+          description: Validation error (includes duplicate key+locale)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /api/v1/translations/{id}:
+    get:
+      summary: Get translation
+      operationId: getTranslation
+      tags: [Translations]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}, example: 1}
+      responses:
+        "200":
+          description: Translation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Translation"
+        "401": {description: Unauthenticated}
+        "404": {description: Not found}
+
+    put:
+      summary: Update translation
+      description: All fields are optional. Only supplied fields are updated. Supplying `tags` replaces the full tag set.
+      operationId: updateTranslation
+      tags: [Translations]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}, example: 1}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                  example: auth.login
+                locale:
+                  type: string
+                  example: fr
+                content:
+                  type: string
+                  example: Se connecter
+                tags:
+                  type: array
+                  items: {type: string}
+                  example: [mobile]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Translation"
+        "401": {description: Unauthenticated}
+        "404": {description: Not found}
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+    delete:
+      summary: Delete translation
+      operationId: deleteTranslation
+      tags: [Translations]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}, example: 1}
+      responses:
+        "204": {description: Deleted}
+        "401": {description: Unauthenticated}
+        "404": {description: Not found}
+
+  # ── Export ────────────────────────────────────────────────────────────────
+
+  /api/v1/export/{locale}:
+    get:
+      summary: Export translations by locale
+      description: >
+        Returns a flat key → value map for the requested locale.
+        The result is cached in Redis for 1 hour. Cache is invalidated automatically
+        on any create, update, or delete for that locale.
+      operationId: exportByLocale
+      tags: [Export]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: locale, in: path, required: true, schema: {type: string}, example: en}
+      responses:
+        "200":
+          description: Key-value translation map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {type: string}
+                example:
+                  auth.login: Login
+                  auth.register: Register
+                  dashboard.title: Dashboard
+        "401": {description: Unauthenticated}
+
+  # ── Tags ──────────────────────────────────────────────────────────────────
+
+  /api/v1/tags:
+    get:
+      summary: List tags
+      operationId: listTags
+      tags: [Tags]
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Tags ordered by name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tag"
+        "401": {description: Unauthenticated}
+
+    post:
+      summary: Create tag
+      description: Tag names are stored lowercase. Returns 422 on duplicate.
+      operationId: createTag
+      tags: [Tags]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: ios
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Tag"
+        "401": {description: Unauthenticated}
+        "422":
+          description: Validation error (e.g. duplicate name)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
