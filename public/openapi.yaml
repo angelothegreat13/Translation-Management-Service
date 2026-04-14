@@ -143,20 +143,20 @@ paths:
       parameters:
         - name: key
           in: query
-          description: Partial match on translation key
-          schema: {type: string, example: auth}
+          description: "Partial match on translation key. Example: auth"
+          schema: {type: string}
         - name: locale
           in: query
-          description: Exact locale code
-          schema: {type: string, example: en}
+          description: "Exact locale code. Example: en"
+          schema: {type: string}
         - name: content
           in: query
-          description: Search within content
-          schema: {type: string, example: Login}
+          description: "Search within content (full-text for ≥3 chars). Example: Login"
+          schema: {type: string}
         - name: tag
           in: query
-          description: Filter by tag name
-          schema: {type: string, example: mobile}
+          description: "Filter by tag name. Example: mobile"
+          schema: {type: string}
         - name: per_page
           in: query
           description: Items per page (max 100, default 15)
