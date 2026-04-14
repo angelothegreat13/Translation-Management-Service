@@ -250,6 +250,15 @@ Business logic lives in `TranslationService`, data access in `EloquentTranslatio
 
 `GET /api/v1/export/{locale}` is the hot path (CDN miss, mobile app boot). The result is cached per locale with a 1-hour TTL. Any write operation (create, update, delete) that affects that locale immediately invalidates the cache. The service uses an injected `CacheRepository` rather than the `Cache` facade so the caching behaviour is fully unit-testable with Mockery.
 
+### CDN Support
+
+The export endpoint is designed to be placed behind a CDN (CloudFront, Fastly, Cloudflare, etc.):
+
+- **Flat JSON response** — `key → value` map with no pagination envelope; CDN serves the whole file in one request, exactly the shape frontend frameworks expect.
+- **`Cache-Control: public, max-age=3600`** — tells the CDN edge nodes they are allowed to cache and serve the response for up to 1 hour without hitting the origin.
+- **Redis as origin cache** — on a CDN cache miss the request reaches the origin, which serves from Redis in milliseconds rather than querying MySQL.
+- **Cache invalidation** — any create, update, or delete immediately purges the Redis key so the next CDN miss fetches fresh data.
+
 ### MySQL FULLTEXT + Indexes
 
 The `translations` table has:

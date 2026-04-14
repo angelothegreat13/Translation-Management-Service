@@ -18,6 +18,7 @@ class ExportController extends Controller
     {
         $translations = $this->service->export($locale);
 
-        return response()->json($translations);
+        return response()->json($translations)
+            ->header('Cache-Control', 'public, max-age=3600');
     }
 }

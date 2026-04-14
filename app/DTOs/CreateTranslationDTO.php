@@ -6,13 +6,13 @@ namespace App\DTOs;
 
 use App\Http\Requests\StoreTranslationRequest;
 
-final class CreateTranslationDTO
+final readonly class CreateTranslationDTO
 {
     public function __construct(
-        public readonly string $key,
-        public readonly string $locale,
-        public readonly string $content,
-        public readonly array $tags = [],
+        public string $key,
+        public string $locale,
+        public string $content,
+        public array $tags = [],
     ) {}
 
     public static function fromRequest(StoreTranslationRequest $request): self

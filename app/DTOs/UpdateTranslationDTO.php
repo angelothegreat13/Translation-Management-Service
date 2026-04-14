@@ -6,13 +6,13 @@ namespace App\DTOs;
 
 use App\Http\Requests\UpdateTranslationRequest;
 
-final class UpdateTranslationDTO
+final readonly class UpdateTranslationDTO
 {
     public function __construct(
-        public readonly ?string $key = null,
-        public readonly ?string $locale = null,
-        public readonly ?string $content = null,
-        public readonly ?array $tags = null,
+        public ?string $key = null,
+        public ?string $locale = null,
+        public ?string $content = null,
+        public ?array $tags = null,
     ) {}
 
     public static function fromRequest(UpdateTranslationRequest $request): self
