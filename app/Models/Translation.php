@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Tag extends Model
+class Translation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['key', 'locale', 'content'];
 
-    public function translations(): BelongsToMany
+    public function tags(): BelongsToMany
     {
-        return $this->belongsToMany(Translation::class, 'translation_tag');
+        return $this->belongsToMany(Tag::class, 'translation_tag');
     }
 }
