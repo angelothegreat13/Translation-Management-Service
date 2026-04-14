@@ -134,7 +134,7 @@ BCRYPT_ROUNDS=4       # Faster password hashing in tests
 docker compose exec app ./vendor/bin/pest --exclude-group=performance
 ```
 
-Expected output: **46 tests, all passing**, in under 10 seconds.
+Expected output: **44 tests, all passing**.
 
 ### Performance tests — must be run separately
 
@@ -278,7 +278,7 @@ The `translations` table has:
 | Suite | Tests | What it covers |
 |---|---|---|
 | Unit | 8 | `TranslationService` with mocked repository and cache |
-| Feature | 38 | Full HTTP stack — auth, CRUD, all search filters, export, tags |
+| Feature | 36 | Full HTTP stack — auth, CRUD, all search filters, export, tags |
 | Performance | 5 | 100 000-row dataset — cold/warm export cache, search by locale/key/tag |
 
 ---
