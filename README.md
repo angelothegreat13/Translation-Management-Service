@@ -1,58 +1,195 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Translation Management Service
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A RESTful API for managing multi-locale translations with tag-based categorisation, full-text search, and Redis-cached exports. Built with Laravel 13, MySQL 8, and Docker.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Tech Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Layer | Choice |
+|---|---|
+| Framework | Laravel 13 (PHP 8.4) |
+| Auth | Laravel Sanctum (Bearer token) |
+| Database | MySQL 8.0 |
+| Cache | Redis |
+| Testing | Pest v4 |
+| Containers | Docker + Nginx |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Quick Start
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Prerequisites
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- Docker Desktop running
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### 1. Clone and copy environment file
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone <your-repo-url>
+cd translation-service
+cp .env.example .env
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 2. Update `.env` database credentials
 
-## Contributing
+```dotenv
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=translation_service
+DB_USERNAME=translation_user
+DB_PASSWORD=secret
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+REDIS_HOST=redis
 
-## Code of Conduct
+CACHE_STORE=redis
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 3. Start containers
 
-## Security Vulnerabilities
+```bash
+docker compose up -d --build
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+This starts four services: **nginx** (port 8000), **app** (PHP-FPM), **db** (MySQL 8, host port 3307), and **redis**.
 
-## License
+### 4. Install dependencies and run migrations
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+docker compose exec app composer install
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate
+```
+
+### 5. Create a user for authentication
+
+> **Required before using the API or Swagger UI.** This is the account you will log in with.
+
+```bash
+docker compose exec app php artisan tinker --execute="App\Models\User::factory()->create(['email'=>'admin@example.com','password'=>bcrypt('password')])"
+```
+
+### 6. Open the API documentation
+
+Visit **http://localhost:8000** — it redirects to the interactive Swagger UI at `/api-docs.html`.
+
+**To authenticate in Swagger UI:**
+
+1. Click **POST /api/v1/auth/token** → **Try it out** → execute with `admin@example.com` / `password`
+2. Copy the `token` value from the response
+3. Click **Authorize** (lock icon, top right) → paste the token → **Authorize**
+4. All protected endpoints are now unlocked — you can test them directly in the browser
+
+> The user created in step 5 is required for step 1 to succeed. Without it, the token request returns 401.
+
+---
+
+## Running Tests
+
+### Standard suite (unit + feature)
+
+```bash
+docker compose exec app ./vendor/bin/pest --exclude-group=performance
+```
+
+### Performance tests — run separately
+
+```bash
+docker compose exec app ./vendor/bin/pest --group=performance
+```
+
+> **Run performance tests on their own.** Each test seeds 100 000 records in `beforeEach`, which takes ~40 seconds total. Running them alongside the standard suite would make every non-performance test wait for the full seed on every run.
+
+---
+
+## Seed 100 000 Translations
+
+```bash
+docker compose exec app php artisan translations:seed
+# Custom count:
+docker compose exec app php artisan translations:seed --count=50000
+```
+
+---
+
+## API Endpoints
+
+All protected routes require `Authorization: Bearer <token>`.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/auth/token` | Issue Sanctum token |
+| GET | `/api/v1/translations` | Paginated list with filters |
+| POST | `/api/v1/translations` | Create translation |
+| GET | `/api/v1/translations/{id}` | Get single translation |
+| PUT | `/api/v1/translations/{id}` | Update translation |
+| DELETE | `/api/v1/translations/{id}` | Delete translation |
+| GET | `/api/v1/export/{locale}` | Export key→value map (cached) |
+| GET | `/api/v1/tags` | List all tags |
+| POST | `/api/v1/tags` | Create tag |
+
+### Search filters (GET /api/v1/translations)
+
+| Param | Behaviour |
+|---|---|
+| `key` | Partial match (`LIKE %value%`) |
+| `locale` | Exact match |
+| `content` | MySQL FULLTEXT for ≥ 3 chars, LIKE fallback |
+| `tag` | Filters by tag name |
+| `per_page` | 1–100, default 15 |
+
+---
+
+## Design Choices
+
+### Service-Repository Pattern
+
+Business logic lives in `TranslationService`, data access in `EloquentTranslationRepository`, bound together via `TranslationRepositoryInterface`. This inverts the dependency so services are testable without a real database (unit tests mock the interface), and the repository can be swapped without touching service code.
+
+### Data Transfer Objects (DTOs)
+
+`CreateTranslationDTO` and `UpdateTranslationDTO` are PHP 8.4 `readonly` value objects built directly from validated request data. They make method signatures explicit, prevent partial or invalid state from reaching the service layer, and are trivial to unit-test.
+
+### API Resources
+
+`TranslationResource` and `TagResource` use `whenLoaded()` to guard against N+1 queries. The response shape is decoupled from the Eloquent model — renaming a column never breaks the API contract.
+
+### Redis Export Cache
+
+`GET /api/v1/export/{locale}` is the hot path in production (CDN miss, mobile app boot, etc.). The result is cached per locale with a 1-hour TTL. Any create, update, or delete that affects that locale calls `invalidateCache()` immediately, so the cache is never stale. Using the injected `CacheRepository` (rather than the `Cache` facade) keeps the service unit-testable.
+
+### MySQL FULLTEXT + Composite Index
+
+The `translations` table has:
+- `FULLTEXT` index on `content` — used when the search term is ≥ 3 characters
+- `UNIQUE (key, locale)` — enforced at the DB level, not just in validation
+- Individual indexes on `key` and `locale` — used by paginate filters
+
+### Why MySQL for Tests (not SQLite)
+
+The test suite runs against a real MySQL 8 database (`translation_service_test`, created automatically by `docker/mysql/init.sql`). SQLite was ruled out because it does not support `FULLTEXT` indexes or the `whereFullText()` query used in content search — tests would pass against SQLite and silently fail in production. Running the same engine in tests and production eliminates that class of divergence entirely.
+
+### Batch Insert Seeder
+
+The seeder inserts in batches of 1 000 rows using raw `DB::table()->insert()` to bypass Eloquent overhead. Pivot records are built using `lastInsertId()` (which returns the first ID of a batch on MySQL) and inserted with `insertOrIgnore`. This seeds 100 000 translations in seconds.
+
+### Security
+
+- **Sanctum token auth** — stateless Bearer tokens, no session cookies
+- **FormRequest validation** — all input validated and typed before reaching the service
+- **Unique constraint** — duplicate `key + locale` rejected at both validation and DB level
+- **No mass-assignment exposure** — `$fillable` is explicit on every model
+
+### Testing Strategy
+
+| Suite | Count | What it covers |
+|---|---|---|
+| Unit (`tests/Unit`) | 8 | Service logic with mocked repository and cache |
+| Feature (`tests/Feature`) | 38 | Full HTTP stack — CRUD, search, auth, export, tags |
+| Performance (`--group=performance`) | 5 | 100 000-row DB — export cold/warm cache, search by locale/key/tag |
+
+---
+
+## Production Considerations
+
+**Laravel Octane with FrankenPHP** would be the natural next step for production — eliminating per-request framework bootstrap overhead. Omitted here to keep the Docker setup clean and the scope focused on correctness over raw throughput.

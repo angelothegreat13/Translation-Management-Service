@@ -26,7 +26,7 @@ it('exports translations for a locale in under 500ms (cold cache)', function () 
 
     $response->assertOk();
     expect($durationMs)->toBeLessThan(500);
-})->timeout(30);
+});
 
 it('exports translations for a locale in under 50ms (warm cache)', function () {
     $this->actingAs($this->user)->getJson('/api/v1/export/en');
@@ -40,7 +40,7 @@ it('exports translations for a locale in under 50ms (warm cache)', function () {
 
     $response->assertOk();
     expect($durationMs)->toBeLessThan(50);
-})->timeout(10);
+});
 
 it('searches translations by locale in under 200ms', function () {
     $start = hrtime(true);
@@ -52,7 +52,7 @@ it('searches translations by locale in under 200ms', function () {
 
     $response->assertOk();
     expect($durationMs)->toBeLessThan(200);
-})->timeout(10);
+});
 
 it('searches translations by key in under 200ms', function () {
     $start = hrtime(true);
@@ -64,7 +64,7 @@ it('searches translations by key in under 200ms', function () {
 
     $response->assertOk();
     expect($durationMs)->toBeLessThan(200);
-})->timeout(10);
+});
 
 it('searches translations by tag in under 200ms', function () {
     $start = hrtime(true);
@@ -76,4 +76,4 @@ it('searches translations by tag in under 200ms', function () {
 
     $response->assertOk();
     expect($durationMs)->toBeLessThan(200);
-})->timeout(10);
+});
